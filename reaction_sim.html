@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reaction Lab: H₂ + I₂ ⇌ 2 HI</title>
+<style>
+:root{
+  --bg:#f6f7fb; --panel:#ffffff; --ink:#1b2333; --muted:#5d6779; --line:#dfe3ec;
+  --accent:#4f46e5; --accent-ink:#ffffff; --good:#15803d;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0b0f1a; --panel:#141a2b; --ink:#e7ebf5; --muted:#99a3b8; --line:#273049;
+         --accent:#8b83ff; --accent-ink:#0b0f1a; --good:#4ade80; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.5rem;margin:0 0 2px}
+h2{font-size:.95rem;margin:0 0 10px;letter-spacing:.01em}
+.sub{margin:0 0 18px;color:var(--muted)}
+.layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.layout{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.side .card:last-child{margin-bottom:0}
+.canvas-wrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#0e1424}
+canvas{display:block;width:100%;height:auto}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:20px;background:rgba(8,12,23,.88);color:#e7ebf5;font-size:1rem}
+#overlay.hidden{display:none}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 2px 16px;font-size:.85rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.ring{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid}
+.chart-title{display:flex;justify-content:space-between;align-items:baseline;margin:0 2px 6px}
+.chart-title h2{margin:0}
+.chart-title small{color:var(--muted)}
+.ctl{margin-bottom:14px}
+.ctl label{display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px}
+.ctl output{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.ctl input[type=range]{width:100%;accent-color:var(--accent)}
+.hint{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+.ctl.row{display:flex;align-items:center;justify-content:space-between}
+.ctl.row label{margin:0}
+select{width:100%;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit}
+.switch{position:relative;width:46px;height:26px;flex:none}
+.switch input{opacity:0;position:absolute;inset:0;margin:0;cursor:pointer;z-index:1}
+.switch .track{position:absolute;inset:0;border-radius:13px;background:var(--line);transition:background .15s}
+.switch .thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .15s}
+.switch input:checked ~ .track{background:var(--accent)}
+.switch input:checked ~ .thumb{transform:translateX(20px)}
+.switch input:focus-visible ~ .track{outline:2px solid var(--accent);outline-offset:2px}
+.btns{display:flex;gap:8px}
+button{flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  font:inherit;font-weight:600;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+.counts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.count{border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center}
+.count b{display:block;font-size:1.35rem;font-variant-numeric:tabular-nums;line-height:1.2}
+.count span{font-size:.8rem;color:var(--muted)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:.9rem;font-variant-numeric:tabular-nums}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;text-align:right}
+#status{margin-top:10px;padding:8px 10px;border-radius:8px;background:var(--bg);font-size:.9rem;min-height:2.6em}
+svg text{font:11px system-ui,sans-serif;fill:var(--muted)}
+svg text.strong{fill:var(--ink);font-weight:600}
+details.card summary{cursor:pointer;font-weight:600}
+details.card ol{margin:10px 0 0;padding-left:20px}
+details.card li{margin-bottom:6px}
+.note{color:var(--muted);font-size:.82rem;margin:0}
+</style>
+</head>
+<body>
+<main>
+  <h1>Reaction Lab</h1>
+  <p class="sub">Watch H₂ + I₂ ⇌ 2 HI happen one collision at a time. Every particle is simulated in Python, right in your browser.</p>
+
+  <div class="layout">
+    <section class="stage">
+      <div class="canvas-wrap">
+        <canvas id="sim" aria-label="Particles moving and reacting in a box"></canvas>
+        <div id="overlay" role="status">Loading Python…<br>(the first load downloads about 10 MB)</div>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:#e2e8f0"></i>H₂ (hydrogen)</span>
+        <span><i class="dot" style="background:#a78bfa"></i>I₂ (iodine)</span>
+        <span><i class="dot" style="background:#fb923c"></i>HI (hydrogen iodide)</span>
+        <span><i class="ring" style="border-color:#4ade80"></i>forward reaction just happened</span>
+        <span><i class="ring" style="border-color:#f87171"></i>reverse reaction just happened</span>
+      </div>
+      <div class="chart-title"><h2>Particles over time</h2><small>H₂ and I₂ stay equal here, so their lines overlap (solid + dashed)</small></div>
+      <div class="canvas-wrap"><canvas id="chart" aria-label="Chart of particle counts over time"></canvas></div>
+    </section>
+
+    <aside class="side">
+      <div class="card">
+        <h2>Controls</h2>
+        <div class="ctl">
+          <label for="temp">Temperature <output id="temp-val">1.00</output></label>
+          <input id="temp" type="range" min="0.4" max="3" step="0.05" value="1">
+          <div class="hint"><span>cold</span><span>hot</span></div>
+        </div>
+        <div class="ctl row">
+          <label for="cat">Catalyst</label>
+          <span class="switch"><input id="cat" type="checkbox" role="switch"><span class="track"></span><span class="thumb"></span></span>
+        </div>
+        <div class="ctl">
+          <label for="n">Particles <output id="n-val">240</output></label>
+          <input id="n" type="range" min="100" max="400" step="20" value="240">
+          <div class="hint"><span>fewer</span><span>more (changing restarts)</span></div>
+        </div>
+        <div class="ctl">
+          <label for="start">Start with</label>
+          <select id="start">
+            <option value="reactants">H₂ + I₂ (no HI yet)</option>
+            <option value="products">HI only</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <label for="speed">Speed</label>
+          <select id="speed">
+            <option value="1">1× (real time)</option>
+            <option value="2" selected>2×</option>
+            <option value="4">4×</option>
+            <option value="8">8×</option>
+          </select>
+        </div>
+        <div class="btns">
+          <button id="pause" disabled>Pause</button>
+          <button id="restart" class="primary" disabled>Restart</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Right now</h2>
+        <div class="counts">
+          <div class="count"><b id="c-h2">–</b><span>H₂</span></div>
+          <div class="count"><b id="c-i2">–</b><span>I₂</span></div>
+          <div class="count"><b id="c-hi">–</b><span>HI</span></div>
+        </div>
+        <dl class="kv">
+          <dt>Time</dt><dd id="t-sim">–</dd>
+          <dt>Measured gas temperature</dt><dd id="t-gas">–</dd>
+          <dt>Forward reactions per second</dt><dd id="r-f">–</dd>
+          <dt>Reverse reactions per second</dt><dd id="r-r">–</dd>
+        </dl>
+        <div id="status" aria-live="polite">Waiting for Python…</div>
+      </div>
+
+      <div class="card">
+        <h2>Energy diagram</h2>
+        <svg id="diagram" viewBox="0 0 300 190" width="100%" role="img"
+             aria-label="Energy versus reaction progress, showing the activation energy hump"></svg>
+      </div>
+    </aside>
+  </div>
+
+  <details class="card try" open>
+    <summary>Things to try</summary>
+    <ol>
+      <li><b>Watch it settle.</b> Start with H₂ + I₂. HI climbs, then levels off. Reactions keep happening, but the forward and reverse rates match. That is equilibrium.</li>
+      <li><b>Add a catalyst mid-run.</b> The mix reaches its level sooner, but the final amounts barely change. A catalyst lowers the hump in both directions.</li>
+      <li><b>Turn up the heat.</b> Reactions speed up, because more collisions have enough energy to get over the hump. Notice the equilibrium also shifts slightly toward H₂ and I₂, since this reaction gives off energy.</li>
+      <li><b>Start from HI only.</b> It settles to the same mix as before. Equilibrium doesn't depend on which side you start from.</li>
+      <li><b>Go as cold as it will go.</b> Collisions still happen constantly, but almost none have enough energy to react.</li>
+    </ol>
+  </details>
+
+  <p class="note">Simplified model: a 2D box, particles drawn as discs with equal mass, and energies in made-up units. It is designed to show the ideas of collisions, activation energy, catalysts and equilibrium, not to predict real numbers.</p>
+</main>
+
+<!-- ============================ PYTHON: the simulation ============================ -->
+<script type="text/python" id="py-sim">
+import numpy as np
+
+
+class Simulation:
+    """A 2D gas of discs reacting:  H2 + I2  <->  2 HI  (exothermic).
+
+    Energies are in reduced units where the average kinetic energy of a
+    particle is equal to the temperature T.
+    """
+
+    W, H, R = 640.0, 420.0, 6.0   # box size and particle radius (pixels)
+    V0 = 50.0                     # pixels/second that count as one reduced velocity unit
+    DT = 1.0 / 60.0               # one simulation step (seconds)
+    EA_F = 1.6                    # activation energy of the forward reaction
+    DELTA = 1.0                   # energy released by the forward reaction
+    CAT_DROP = 1.0                # how much a catalyst lowers the barrier
+    STERIC = 0.5                  # chance an energetic collision also has the right orientation
+    TAU = 0.4                     # how fast the gas relaxes to the chosen temperature (seconds)
+    H2, I2, HI = 0, 1, 2
+
+    def __init__(self, n=240, start="reactants", temperature=1.0, catalyst=False, seed=None):
+        self.rng = np.random.default_rng(seed)
+        self.n = int(n)
+        self.temperature = float(temperature)
+        self.catalyst = bool(catalyst)
+        self.t = 0.0
+        self.forward_count = 0
+        self.reverse_count = 0
+        self.events = []
+        self._place(start)
+
+    # ---- setup -------------------------------------------------------------
+    def _place(self, start):
+        r = self.R
+        spacing = 2 * r + 3
+        cols = int((self.W - 2 * r) // spacing)
+        rows = int((self.H - 2 * r) // spacing)
+        cells = self.rng.permutation(cols * rows)[: self.n]
+        jitter = self.rng.uniform(-1.0, 1.0, size=(self.n, 2))
+        self.x = r + 1.5 + (cells % cols) * spacing + jitter[:, 0]
+        self.y = r + 1.5 + (cells // cols) * spacing + jitter[:, 1]
+
+        if start == "products":
+            self.kind = np.full(self.n, self.HI, dtype=np.int8)
+        else:
+            self.kind = np.where(np.arange(self.n) < self.n // 2, self.H2, self.I2).astype(np.int8)
+            self.rng.shuffle(self.kind)
+
+        sd = self.V0 * np.sqrt(self.temperature)
+        self.vx = self.rng.normal(0.0, sd, self.n)
+        self.vy = self.rng.normal(0.0, sd, self.n)
+        self.vx -= self.vx.mean()
+        self.vy -= self.vy.mean()
+
+    def set_conditions(self, temperature, catalyst):
+        self.temperature = float(temperature)
+        self.catalyst = bool(catalyst)
+
+    # ---- energies ----------------------------------------------------------
+    @property
+    def ea_forward(self):
+        return self.EA_F - (self.CAT_DROP if self.catalyst else 0.0)
+
+    @property
+    def ea_reverse(self):
+        return self.ea_forward + self.DELTA
+
+    def measured_temperature(self):
+        return float(np.mean(self.vx ** 2 + self.vy ** 2) / (2.0 * self.V0 ** 2))
+
+    # ---- time stepping -----------------------------------------------------
+    def advance(self, steps=1):
+        for _ in range(int(steps)):
+            self._step()
+
+    def _step(self):
+        dt = self.DT
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+        self._walls()
+        self._collisions()
+        self._thermostat()
+        self.t += dt
+
+    def _walls(self):
+        r = self.R
+        m = self.x < r
+        self.x[m] = 2 * r - self.x[m]
+        self.vx[m] = np.abs(self.vx[m])
+        m = self.x > self.W - r
+        self.x[m] = 2 * (self.W - r) - self.x[m]
+        self.vx[m] = -np.abs(self.vx[m])
+        m = self.y < r
+        self.y[m] = 2 * r - self.y[m]
+        self.vy[m] = np.abs(self.vy[m])
+        m = self.y > self.H - r
+        self.y[m] = 2 * (self.H - r) - self.y[m]
+        self.vy[m] = -np.abs(self.vy[m])
+
+    def _collisions(self):
+        x, y = self.x, self.y
+        dx = x[None, :] - x[:, None]
+        dy = y[None, :] - y[:, None]
+        d2 = dx * dx + dy * dy
+        ii, jj = np.nonzero(d2 < (2 * self.R) ** 2)
+        keep = ii < jj
+        for i, j in zip(ii[keep].tolist(), jj[keep].tolist()):
+            self._collide(i, j)
+
+    def _collide(self, i, j):
+        x, y, vx, vy, kind = self.x, self.y, self.vx, self.vy, self.kind
+        D = 2 * self.R
+        ddx = x[j] - x[i]
+        ddy = y[j] - y[i]
+        d2 = ddx * ddx + ddy * ddy
+        if d2 >= D * D:
+            return
+        dist = d2 ** 0.5
+        if dist < 1e-9:
+            nx, ny, dist = 1.0, 0.0, 1e-9
+        else:
+            nx, ny = ddx / dist, ddy / dist
+
+        # push overlapping particles apart so they don't stick together
+        push = (D - dist) / 2 + 1e-6
+        x[i] -= nx * push
+        y[i] -= ny * push
+        x[j] += nx * push
+        y[j] += ny * push
+
+        # speed at which they approach each other along the line between centres
+        vn = (vx[i] - vx[j]) * nx + (vy[i] - vy[j]) * ny
+        if vn <= 0:
+            return                      # already moving apart
+
+        # collision energy = kinetic energy of the head-on part of the motion
+        ke = 0.25 * (vn / self.V0) ** 2
+        out_ke = ke
+        a, b = int(kind[i]), int(kind[j])
+
+        if a != b and a != self.HI and b != self.HI:            # H2 meets I2
+            if ke >= self.ea_forward and self.rng.random() < self.STERIC:
+                kind[i] = kind[j] = self.HI
+                out_ke = ke + self.DELTA                         # reaction releases energy
+                self.forward_count += 1
+                self.events += [float(x[i] + x[j]) / 2, float(y[i] + y[j]) / 2, 1]
+        elif a == self.HI and b == self.HI:                      # HI meets HI
+            if ke >= self.ea_reverse and self.rng.random() < self.STERIC:
+                if self.rng.random() < 0.5:
+                    kind[i], kind[j] = self.H2, self.I2
+                else:
+                    kind[i], kind[j] = self.I2, self.H2
+                out_ke = ke - self.DELTA                         # reaction absorbs energy
+                self.reverse_count += 1
+                self.events += [float(x[i] + x[j]) / 2, float(y[i] + y[j]) / 2, -1]
+
+        vn_out = 2.0 * self.V0 * (out_ke ** 0.5)                 # speed of separation afterwards
+        J = (vn + vn_out) / 2.0                                  # equal masses: momentum is conserved
+        vx[i] -= J * nx
+        vy[i] -= J * ny
+        vx[j] += J * nx
+        vy[j] += J * ny
+
+    def _thermostat(self):
+        """Gently steer the gas toward the chosen temperature (like a heat bath)."""
+        t_now = self.measured_temperature()
+        if t_now <= 1e-9:
+            return
+        lam = 1.0 + (self.DT / self.TAU) * (self.temperature / t_now - 1.0)
+        lam = min(1.1, max(0.9, max(lam, 0.0) ** 0.5))
+        self.vx *= lam
+        self.vy *= lam
+
+    # ---- results for the page ---------------------------------------------
+    def counts(self):
+        return np.bincount(self.kind, minlength=3)
+
+    def snapshot(self):
+        pos = np.empty(3 * self.n, dtype=np.float32)
+        pos[0::3] = self.x
+        pos[1::3] = self.y
+        pos[2::3] = self.kind
+        ev = self.events[-90:]
+        self.events = []
+        return {
+            "t": self.t,
+            "counts": self.counts().tolist(),
+            "forward": self.forward_count,
+            "reverse": self.reverse_count,
+            "temperature_now": self.measured_temperature(),
+            "particles": pos.tolist(),
+            "events": ev,
+        }
+</script>
+
+<!-- ============================ PYTHON: bridge to the page ============================ -->
+<script type="text/python" id="py-bridge">
+from pyodide.ffi import to_js
+from js import Object
+
+_sim = None
+
+
+def _out(d):
+    return to_js(d, dict_converter=Object.fromEntries)
+
+
+def make(n, start_with_products, temperature, catalyst):
+    global _sim
+    _sim = Simulation(n=n, start="products" if start_with_products else "reactants",
+                      temperature=temperature, catalyst=catalyst)
+
+
+def set_conditions(temperature, catalyst):
+    _sim.set_conditions(temperature, catalyst)
+
+
+def advance(steps):
+    _sim.advance(steps)
+    return _out(_sim.snapshot())
+
+
+def info():
+    S = Simulation
+    return _out({
+        "width": S.W, "height": S.H, "radius": S.R,
+        "ea_f": S.EA_F, "ea_f_cat": S.EA_F - S.CAT_DROP,
+        "delta": S.DELTA,
+    })
+</script>
+
+<!-- ============================ JavaScript: drawing and controls ============================ -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const COLORS = ['#e2e8f0', '#a78bfa', '#fb923c'];
+const CW = 640, CH = 230;                       // chart size
+let W = 640, H = 420, R = 6;                    // replaced by values from Python
+let pyodide, pyMake, pyAdvance, pySet, pyInfo, P;
+let ready = false, paused = false, failed = false;
+let state = null, flashes = [];
+const hist = [], markers = [];
+
+const el = { temp: $('temp'), cat: $('cat'), n: $('n'), start: $('start'),
+             speed: $('speed'), pause: $('pause'), restart: $('restart') };
+
+function setupCanvas(c, w, h) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
+}
+const sctx = setupCanvas($('sim'), W, H);
+const cctx = setupCanvas($('chart'), CW, CH);
+
+function showOverlay(html) { const o = $('overlay'); o.innerHTML = html; o.classList.remove('hidden'); }
+function hideOverlay() { $('overlay').classList.add('hidden'); }
+function fail(err) {
+  failed = true; console.error(err);
+  showOverlay('Something went wrong.<br><small>' + String(err && err.message || err) +
+              '</small><br><br>Try reloading the page.');
+}
+
+// ---------- boot Python ----------
+async function boot() {
+  try {
+    if (typeof loadPyodide !== 'function')
+      throw new Error('Could not download Python. Check your internet connection and reload.');
+    pyodide = await loadPyodide();
+    showOverlay('Loading NumPy…');
+    await pyodide.loadPackage('numpy');
+    pyodide.runPython($('py-sim').textContent);
+    pyodide.runPython($('py-bridge').textContent);
+    pyMake = pyodide.globals.get('make');
+    pyAdvance = pyodide.globals.get('advance');
+    pySet = pyodide.globals.get('set_conditions');
+    pyInfo = pyodide.globals.get('info');
+    P = pyInfo(); W = P.width; H = P.height; R = P.radius;
+    ready = true;
+    el.pause.disabled = false; el.restart.disabled = false;
+    restart();
+    hideOverlay();
+  } catch (e) { fail(e); }
+}
+
+// ---------- run control ----------
+function restart() {
+  if (!ready) return;
+  try {
+    pyMake(+el.n.value, el.start.value === 'products', +el.temp.value, el.cat.checked);
+    hist.length = 0; markers.length = 0; flashes = [];
+    state = pyAdvance(0);
+    record(state);
+    updateDiagram();
+  } catch (e) { fail(e); }
+}
+function record(s) {
+  const last = hist[hist.length - 1];
+  if (!last || s.t - last.t >= 0.25)
+    hist.push({ t: s.t, h2: s.counts[0], i2: s.counts[1], hi: s.counts[2], f: s.forward, r: s.reverse });
+}
+function addFlashes(ev) {
+  const now = performance.now();
+  for (let k = 0; k < ev.length; k += 3) flashes.push({ x: ev[k], y: ev[k + 1], sign: ev[k + 2], t0: now });
+}
+function addMarker(label) { if (state) markers.push({ t: state.t, label }); }
+
+el.temp.addEventListener('input', () => {
+  $('temp-val').textContent = (+el.temp.value).toFixed(2);
+  if (ready) pySet(+el.temp.value, el.cat.checked);
+});
+el.temp.addEventListener('change', () => addMarker('T=' + (+el.temp.value).toFixed(1)));
+el.cat.addEventListener('change', () => {
+  if (ready) pySet(+el.temp.value, el.cat.checked);
+  updateDiagram(); addMarker(el.cat.checked ? 'catalyst on' : 'catalyst off');
+});
+el.n.addEventListener('input', () => { $('n-val').textContent = el.n.value; });
+el.n.addEventListener('change', restart);
+el.start.addEventListener('change', restart);
+el.restart.addEventListener('click', restart);
+el.pause.addEventListener('click', () => {
+  paused = !paused; el.pause.textContent = paused ? 'Resume' : 'Pause';
+});
+
+// ---------- drawing: particle box ----------
+function drawSim() {
+  const c = sctx;
+  c.fillStyle = '#0e1424'; c.fillRect(0, 0, W, H);
+  if (!state) return;
+  const p = state.particles;
+  for (let k = 0; k < p.length; k += 3) {
+    c.beginPath(); c.arc(p[k], p[k + 1], R, 0, 6.2832);
+    c.fillStyle = COLORS[p[k + 2]]; c.fill();
+  }
+  const now = performance.now();
+  flashes = flashes.filter(f => now - f.t0 < 500);
+  c.lineWidth = 2;
+  for (const f of flashes) {
+    const a = (now - f.t0) / 500;
+    c.beginPath(); c.arc(f.x, f.y, R + 2 + a * 18, 0, 6.2832);
+    c.strokeStyle = f.sign > 0 ? `rgba(74,222,128,${1 - a})` : `rgba(248,113,113,${1 - a})`;
+    c.stroke();
+  }
+}
+
+// ---------- drawing: chart ----------
+function drawChart() {
+  const c = cctx, L = 40, Rt = CW - 12, T = 22, B = CH - 26;
+  c.fillStyle = '#0e1424'; c.fillRect(0, 0, CW, CH);
+  const total = state ? state.counts[0] + state.counts[1] + state.counts[2] : 1;
+  const span = 60, tNow = state ? state.t : 0;
+  const t1 = Math.max(span, tNow), t0 = t1 - span;
+  const X = t => L + (t - t0) / span * (Rt - L);
+  const Y = v => B - (v / total) * (B - T);
+
+  c.font = '11px system-ui, sans-serif'; c.textBaseline = 'middle'; c.textAlign = 'right';
+  c.strokeStyle = 'rgba(255,255,255,.10)'; c.fillStyle = '#99a3b8'; c.lineWidth = 1;
+  for (const f of [0, .25, .5, .75, 1]) {
+    const y = Y(total * f);
+    c.beginPath(); c.moveTo(L, y); c.lineTo(Rt, y); c.stroke();
+    c.fillText(Math.round(total * f), L - 6, y);
+  }
+  c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let tt = Math.ceil(t0 / 10) * 10; tt <= t1; tt += 10) c.fillText(tt + ' s', X(tt), B + 6);
+
+  for (const m of markers) {
+    if (m.t < t0) continue;
+    const x = X(m.t);
+    c.setLineDash([4, 3]); c.strokeStyle = 'rgba(255,255,255,.35)';
+    c.beginPath(); c.moveTo(x, T - 4); c.lineTo(x, B); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#e7ebf5'; c.textAlign = x > Rt - 70 ? 'right' : 'left'; c.textBaseline = 'bottom';
+    c.fillText(m.label, x + (x > Rt - 70 ? -3 : 3), T + 4);
+  }
+
+  function series(key, color, dash, width) {
+    c.beginPath(); let first = true;
+    for (const h of hist) {
+      if (h.t < t0 - 1) continue;
+      const x = X(h.t), y = Y(h[key]);
+      if (first) { c.moveTo(x, y); first = false; } else c.lineTo(x, y);
+    }
+    c.setLineDash(dash); c.strokeStyle = color; c.lineWidth = width; c.lineJoin = 'round'; c.stroke();
+    c.setLineDash([]);
+  }
+  series('hi', COLORS[2], [], 2.5);
+  series('h2', COLORS[0], [], 2.5);
+  series('i2', COLORS[1], [6, 6], 2.5);
+}
+
+// ---------- readouts ----------
+function rates() {
+  const last = hist[hist.length - 1];
+  if (!last) return null;
+  let k = hist.length - 1;
+  while (k > 0 && last.t - hist[k - 1].t <= 5) k--;
+  const a = hist[k], dt = last.t - a.t;
+  if (dt < 1) return null;
+  return { f: (last.f - a.f) / dt, r: (last.r - a.r) / dt, events: (last.f - a.f) + (last.r - a.r) };
+}
+function updateReadouts() {
+  if (!state) return;
+  $('c-h2').textContent = state.counts[0];
+  $('c-i2').textContent = state.counts[1];
+  $('c-hi').textContent = state.counts[2];
+  $('t-sim').textContent = state.t.toFixed(1) + ' s';
+  $('t-gas').textContent = state.temperature_now.toFixed(2);
+  const r = rates();
+  let msg;
+  if (!r) { msg = 'Warming up…'; $('r-f').textContent = $('r-r').textContent = '–'; }
+  else {
+    $('r-f').textContent = r.f.toFixed(1);
+    $('r-r').textContent = r.r.toFixed(1);
+    if (r.events < 20) msg = r.events === 0 ? 'Almost no reactions. Collisions rarely have enough energy.' : 'Reacting slowly…';
+    else {
+      const d = (r.f - r.r) / (r.f + r.r);
+      msg = Math.abs(d) < 0.2 ? 'Equilibrium: forward and reverse rates match.'
+          : d > 0 ? 'Mostly forming HI.' : 'Mostly breaking HI back into H₂ and I₂.';
+    }
+  }
+  if ($('status').textContent !== msg) $('status').textContent = msg;
+}
+
+// ---------- energy diagram ----------
+function updateDiagram() {
+  if (!P) return;
+  const cat = el.cat.checked, d = P.delta;
+  const y = e => 118 - e * 44;
+  const path = peak => `M24,${y(0)} H84 C118,${y(0)} 120,${y(peak)} 150,${y(peak)} ` +
+                       `C180,${y(peak)} 182,${y(-d)} 216,${y(-d)} H276`;
+  const peak = cat ? P.ea_f_cat : P.ea_f;
+  let s = '';
+  if (cat) s += `<path d="${path(P.ea_f)}" fill="none" stroke="currentColor" opacity=".45" stroke-width="2" stroke-dasharray="5 4"/>` +
+                `<text x="262" y="${y(P.ea_f) + 2}" text-anchor="end">without catalyst</text>`;
+  s += `<path d="${path(peak)}" fill="none" stroke="var(--accent)" stroke-width="2.6"/>`;
+  s += `<line x1="150" y1="${y(0)}" x2="150" y2="${y(peak)}" stroke="var(--muted)" stroke-dasharray="3 3"/>`;
+  s += `<text class="strong" x="156" y="${(y(0) + y(peak)) / 2 + 4}">Eₐ = ${peak.toFixed(1)}</text>`;
+  s += `<text class="strong" x="54" y="${y(0) - 8}" text-anchor="middle">H₂ + I₂</text>`;
+  s += `<text class="strong" x="246" y="${y(-d) - 8}" text-anchor="middle">2 HI</text>`;
+  s += `<line x1="276" y1="${y(0)}" x2="276" y2="${y(-d)}" stroke="var(--muted)"/>`;
+  s += `<text x="272" y="${(y(0) + y(-d)) / 2 + 4}" text-anchor="end">ΔH = −${d.toFixed(1)}</text>`;
+  s += `<text x="150" y="186" text-anchor="middle">reaction progress →</text>`;
+  s += `<text x="10" y="95" transform="rotate(-90 10 95)" text-anchor="middle">energy →</text>`;
+  $('diagram').style.color = 'var(--ink)';
+  $('diagram').innerHTML = s;
+}
+
+// ---------- main loop (fixed 60 steps/s of simulated time, scaled by the speed setting) ----------
+let lastT = performance.now(), owed = 0;
+function tick(now) {
+  const dtms = Math.min(100, now - lastT); lastT = now;
+  if (ready && !paused && !failed) {
+    owed += dtms / (1000 / 60) * (+el.speed.value);
+    let steps = Math.floor(owed); owed -= steps;
+    steps = Math.min(steps, 24);
+    if (steps > 0) {
+      try { state = pyAdvance(steps); record(state); addFlashes(state.events); }
+      catch (e) { fail(e); }
+    }
+  }
+  drawSim(); drawChart(); updateReadouts();
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+boot();
+</script>
+<noscript>This simulation needs JavaScript turned on.</noscript>
+</body>
+</html>
